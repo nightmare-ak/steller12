@@ -6,9 +6,9 @@ import {
   Contract,
   scValToNative,
 } from "@stellar/stellar-sdk";
+import { signTransaction } from "@stellar/freighter-api";
 
 // ─── Configuration ────────────────────────────────────────
-// Set these after deploying the contract
 export const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "";
 const RPC_URL =
   process.env.NEXT_PUBLIC_RPC_URL || "https://soroban-testnet.stellar.org";
@@ -37,13 +37,17 @@ async function signAndSend(
   txXdr: string,
   networkPassphrase: string = NETWORK_PASSPHRASE
 ): Promise<string> {
-  const { signedTxXdr } = await window.freighterApi.signTransaction(txXdr, {
+  const result = await signTransaction(txXdr, {
     networkPassphrase,
   });
-  const tx = TransactionBuilder.fromXDR(signedTxXdr, networkPassphrase);
+  if (result.error) {
+    throw new Error(result.error.message || "User rejected signing");
+  }
+
+  const tx = TransactionBuilder.fromXDR(result.signedTxXdr, networkPassphrase);
   const sendResult = await server.sendTransaction(tx);
+
   if (sendResult.status === "PENDING" || sendResult.status === "DUPLICATE") {
-    // Wait for confirmation
     for (let i = 0; i < 30; i++) {
       await new Promise((r) => setTimeout(r, 1000));
       const getResult = await server.getTransaction(sendResult.hash);
@@ -57,7 +61,11 @@ async function signAndSend(
     }
     throw new Error("Transaction timeout");
   }
-  throw new Error(`Send failed: ${sendResult.errorResult ? "transaction rejected" : sendResult.status}`);
+  throw new Error(
+    `Send failed: ${
+      sendResult.errorResult ? "transaction rejected" : sendResult.status
+    }`
+  );
 }
 
 // ─── State-changing calls ─────────────────────────────────
@@ -74,7 +82,13 @@ export async function submitScore(
     fee: "10000",
     networkPassphrase: NETWORK_PASSPHRASE,
   })
-    .addOperation(contract.call("submit_score", toScValAddress(callerAddress), toScValU64(score)))
+    .addOperation(
+      contract.call(
+        "submit_score",
+        toScValAddress(callerAddress),
+        toScValU64(score)
+      )
+    )
     .setTimeout(30)
     .build();
 
@@ -115,18 +129,30 @@ export async function getScore(playerAddress: string): Promise<number> {
   }
 }
 
+// Helper: get account for read-only simulation (fallback to a dummy if account doesn't exist)
+async function getReadOnlyAccount(): Promise<any> {
+  const dummyKey = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ";
+  try {
+    return await server.getAccount(dummyKey);
+  } catch {
+    // If the account doesn't exist on testnet, return a minimal stub
+    return {
+      accountId: () => dummyKey,
+      sequenceNumber: () => "0",
+    };
+  }
+}
+
 export async function getLeaderboard(
   topN: number = 10
 ): Promise<LeaderboardEntry[]> {
   if (!CONTRACT_ADDRESS) return [];
 
   try {
-    // Use a public address for read-only calls
-    const publicKey =
-      "GBRUNOVGQNA6D6YKXJD3W6P7PI5L5G7FOJYSFX6KQYIN7P5GMEAAAAAAAA";
+    const source = await getReadOnlyAccount();
     const contract = new Contract(CONTRACT_ADDRESS);
     const result = await server.simulateTransaction(
-      new TransactionBuilder(await server.getAccount(publicKey), {
+      new TransactionBuilder(source, {
         fee: "10000",
         networkPassphrase: NETWORK_PASSPHRASE,
       })
@@ -152,11 +178,10 @@ export async function getRewardToken(): Promise<string> {
   if (!CONTRACT_ADDRESS) return "";
 
   try {
-    const publicKey =
-      "GBRUNOVGQNA6D6YKXJD3W6P7PI5L5G7FOJYSFX6KQYIN7P5GMEAAAAAAAA";
+    const source = await getReadOnlyAccount();
     const contract = new Contract(CONTRACT_ADDRESS);
     const result = await server.simulateTransaction(
-      new TransactionBuilder(await server.getAccount(publicKey), {
+      new TransactionBuilder(source, {
         fee: "10000",
         networkPassphrase: NETWORK_PASSPHRASE,
       })
@@ -171,23 +196,5 @@ export async function getRewardToken(): Promise<string> {
     return "";
   } catch {
     return "";
-  }
-}
-
-// ─── Wallet interaction helper ───────────────────────────
-
-// Freighter types
-declare global {
-  interface Window {
-    freighterApi: {
-      isConnected(): Promise<{ isConnected: boolean }>;
-      isAllowed(): Promise<{ isAllowed: boolean }>;
-      setAllowed(): Promise<{ isAllowed: boolean }>;
-      getAddress(): Promise<{ address: string }>;
-      signTransaction(
-        xdr: string,
-        opts: { networkPassphrase: string }
-      ): Promise<{ signedTxXdr: string }>;
-    };
   }
 }

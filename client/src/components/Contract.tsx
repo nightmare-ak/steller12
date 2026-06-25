@@ -861,7 +861,10 @@ export default function Contract() {
                     {wallet.isConnecting ? "SYNCING..." : "⟡ LINK WALLET"}
                   </button>
                   {wallet.error && (
-                    <p className="text-[10px] text-red-400/70">{wallet.error}</p>
+                    <p className="text-[10px] text-red-400/70 whitespace-pre-line">{wallet.error}</p>
+                  )}
+                  {wallet.debug && !wallet.error && (
+                    <p className="text-[10px] text-zinc-600/50 truncate">{wallet.debug}</p>
                   )}
                 </div>
               )}
