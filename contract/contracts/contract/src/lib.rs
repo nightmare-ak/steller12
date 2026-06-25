@@ -42,23 +42,24 @@ impl Contract {
             .persistent()
             .set(&DataKey::Score(player.clone()), &score);
 
-        // Rebuild leaderboard sorted descending
-        let lb: Vec<Entry> = env.storage().instance().get(&DataKey::Leaderboard).unwrap_or(Vec::new(&env));
+        // Rebuild leaderboard sorted descending (using while loop — no for..iter())
+        let old_lb: Vec<Entry> = env.storage().instance()
+            .get(&DataKey::Leaderboard)
+            .unwrap_or(Vec::new(&env));
         let mut new_lb = Vec::<Entry>::new(&env);
         let mut inserted = false;
+        let mut i: u32 = 0;
 
-        for entry in lb.iter() {
-            if entry.player == player {
-                continue; // skip old entry
+        while i < old_lb.len() {
+            let e = old_lb.get(i).unwrap();
+            if e.player != player {
+                if !inserted && score > e.score {
+                    new_lb.push_back(Entry { player: player.clone(), score });
+                    inserted = true;
+                }
+                new_lb.push_back(e);
             }
-            if !inserted && score > entry.score {
-                new_lb.push_back(Entry {
-                    player: player.clone(),
-                    score,
-                });
-                inserted = true;
-            }
-            new_lb.push_back(entry);
+            i += 1;
         }
         if !inserted {
             new_lb.push_back(Entry { player, score });
@@ -75,18 +76,21 @@ impl Contract {
     }
 
     pub fn get_leaderboard(env: Env, top_n: u32) -> Vec<Entry> {
-        let lb: Vec<Entry> = env.storage().instance().get(&DataKey::Leaderboard).unwrap_or(Vec::new(&env));
+        let lb: Vec<Entry> = env.storage().instance()
+            .get(&DataKey::Leaderboard)
+            .unwrap_or(Vec::new(&env));
         let mut result = Vec::<Entry>::new(&env);
         let count = if top_n < lb.len() { top_n } else { lb.len() };
-        for i in 0..count {
+        let mut i: u32 = 0;
+        while i < count {
             result.push_back(lb.get(i).unwrap());
+            i += 1;
         }
         result
     }
 
     pub fn reward_top_players(env: Env, admin: Address, top_n: u32, amount: i128) {
         admin.require_auth();
-
         let stored_admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
         if admin != stored_admin {
             panic!("unauthorized");
@@ -95,11 +99,12 @@ impl Contract {
         let reward_token: Address = env.storage().instance().get(&DataKey::RewardToken).unwrap();
         let lb: Vec<Entry> = env.storage().instance().get(&DataKey::Leaderboard).unwrap();
         let count = if top_n < lb.len() { top_n } else { lb.len() };
-
-        for i in 0..count {
+        let mut i: u32 = 0;
+        while i < count {
             let entry = lb.get(i).unwrap();
             token::Client::new(&env, &reward_token)
                 .transfer(&env.current_contract_address(), &entry.player, &amount);
+            i += 1;
         }
     }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Client } from "contract";
+import { Client } from "../../packages/contract/dist/index.js";
 import { TransactionBuilder, rpc } from "@stellar/stellar-sdk";
 import { signTransaction } from "@stellar/freighter-api";
 
