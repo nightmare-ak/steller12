@@ -644,6 +644,7 @@ export default function Contract() {
   const [txHash, setTxHash] = useState<string | null>(null);
   const [playerHighScore, setPlayerHighScore] = useState<number>(0);
   const [scoreSubmitted, setScoreSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Fetch leaderboard
   useEffect(() => {
@@ -667,6 +668,7 @@ export default function Contract() {
     setIsPlaying(true);
     setScoreSubmitted(false);
     setTxHash(null);
+    setSubmitError(null);
     setCurrentScore(0);
   }, []);
 
@@ -688,6 +690,8 @@ export default function Contract() {
           setLeaderboard(lb);
           setPlayerHighScore(hs);
         } catch (err: any) {
+          const msg = err?.message || err?.toString() || "Unknown error";
+          setSubmitError(msg);
           console.error("Failed to submit score:", err);
         } finally {
           setIsSubmitting(false);
@@ -795,6 +799,16 @@ export default function Contract() {
                       </p>
                       <p className="text-[10px] text-zinc-600 font-mono break-all">
                         {truncateAddress(txHash)}
+                      </p>
+                    </div>
+                  )}
+                  {submitError && (
+                    <div className="p-3 rounded-lg bg-red-900/20 border border-red-500/20">
+                      <p className="text-red-400/90 text-xs tracking-wider mb-1">
+                        ✦ Transmission Failed ✦
+                      </p>
+                      <p className="text-red-300/60 text-[10px] font-mono leading-relaxed">
+                        {submitError}
                       </p>
                     </div>
                   )}

@@ -76,7 +76,20 @@ export async function submitScore(
 ): Promise<string> {
   if (!CONTRACT_ADDRESS) throw new Error("Contract not deployed yet");
 
-  const account = await server.getAccount(callerAddress);
+  let account;
+  try {
+    account = await server.getAccount(callerAddress);
+  } catch (e: any) {
+    if (e?.response?.status === 404 || `${e}`.includes("not exist")) {
+      throw new Error(
+        "Your Stellar account has not been funded on testnet yet. " +
+          "Get free testnet lumens at https://stellar.org/laboratory#xlm-faucet " +
+          "or ask the team to send you some."
+      );
+    }
+    throw new Error(`Could not fetch account: ${e?.message || e}`);
+  }
+
   const contract = new Contract(CONTRACT_ADDRESS);
   const tx = new TransactionBuilder(account, {
     fee: "10000",
@@ -107,9 +120,10 @@ export async function getScore(playerAddress: string): Promise<number> {
   if (!CONTRACT_ADDRESS) return 0;
 
   try {
+    const source = await getReadOnlyAccount();
     const contract = new Contract(CONTRACT_ADDRESS);
     const result = await server.simulateTransaction(
-      new TransactionBuilder(await server.getAccount(playerAddress), {
+      new TransactionBuilder(source, {
         fee: "10000",
         networkPassphrase: NETWORK_PASSPHRASE,
       })
