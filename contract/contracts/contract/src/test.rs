@@ -200,3 +200,35 @@ fn test_leaderboard_empty() {
     let lb = client.get_leaderboard(&10);
     assert_eq!(lb, vec![&_env]);
 }
+
+#[test]
+fn test_submit_score_without_init() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(Contract, ());
+    let client = ContractClient::new(&env, &contract_id);
+    let player = Address::generate(&env);
+
+    // Should NOT panic even though init() was never called
+    client.submit_score(&player, &100);
+    assert_eq!(client.get_score(&player), 100);
+
+    let lb = client.get_leaderboard(&10);
+    assert_eq!(lb.len(), 1);
+    assert_eq!(lb.get(0).unwrap().player, player);
+    assert_eq!(lb.get(0).unwrap().score, 100);
+}
+
+#[test]
+fn test_get_leaderboard_without_init() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(Contract, ());
+    let client = ContractClient::new(&env, &contract_id);
+
+    // Should return empty leaderboard without panicking
+    let lb = client.get_leaderboard(&10);
+    assert_eq!(lb, vec![&env]);
+}

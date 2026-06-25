@@ -43,7 +43,7 @@ impl Contract {
             .set(&DataKey::Score(player.clone()), &score);
 
         // Rebuild leaderboard sorted descending
-        let lb: Vec<Entry> = env.storage().instance().get(&DataKey::Leaderboard).unwrap();
+        let lb: Vec<Entry> = env.storage().instance().get(&DataKey::Leaderboard).unwrap_or(Vec::new(&env));
         let mut new_lb = Vec::<Entry>::new(&env);
         let mut inserted = false;
 
@@ -75,7 +75,7 @@ impl Contract {
     }
 
     pub fn get_leaderboard(env: Env, top_n: u32) -> Vec<Entry> {
-        let lb: Vec<Entry> = env.storage().instance().get(&DataKey::Leaderboard).unwrap();
+        let lb: Vec<Entry> = env.storage().instance().get(&DataKey::Leaderboard).unwrap_or(Vec::new(&env));
         let mut result = Vec::<Entry>::new(&env);
         let count = if top_n < lb.len() { top_n } else { lb.len() };
         for i in 0..count {

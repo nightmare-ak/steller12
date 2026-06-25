@@ -1,50 +1,43 @@
 "use client";
 
-import {
-  rpc,
-  TransactionBuilder,
-  Contract,
-  scValToNative,
-} from "@stellar/stellar-sdk";
+import { Client } from "contract";
+import { TransactionBuilder, rpc } from "@stellar/stellar-sdk";
 import { signTransaction } from "@stellar/freighter-api";
 
 // ─── Configuration ────────────────────────────────────────
-export const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "";
+export const CONTRACT_ADDRESS =
+  process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "";
 const RPC_URL =
   process.env.NEXT_PUBLIC_RPC_URL || "https://soroban-testnet.stellar.org";
 const NETWORK_PASSPHRASE =
   process.env.NEXT_PUBLIC_NETWORK_PASSPHRASE ||
   "Test SDF Network ; September 2015";
 
-// ─── Helpers ──────────────────────────────────────────────
+// ─── Typed Client ─────────────────────────────────────────
 
-import {
-  toScValU32,
-  toScValU64,
-  toScValAddress,
-} from "@/lib/utils";
-
-const server = new rpc.Server(RPC_URL);
-
-export interface LeaderboardEntry {
-  player: string;
-  score: number;
+/** Get a typed Client instance with the given caller address for simulation. */
+function getClient(callerAddress?: string): Client {
+  return new Client({
+    rpcUrl: RPC_URL,
+    networkPassphrase: NETWORK_PASSPHRASE,
+    contractId: CONTRACT_ADDRESS,
+    publicKey: callerAddress,
+  });
 }
 
 // ─── Sign & Send Transaction ──────────────────────────────
 
-async function signAndSend(
-  txXdr: string,
-  networkPassphrase: string = NETWORK_PASSPHRASE
-): Promise<string> {
+const server = new rpc.Server(RPC_URL);
+
+async function signAndSend(txXdr: string): Promise<string> {
   const result = await signTransaction(txXdr, {
-    networkPassphrase,
+    networkPassphrase: NETWORK_PASSPHRASE,
   });
   if (result.error) {
     throw new Error(result.error.message || "User rejected signing");
   }
 
-  const tx = TransactionBuilder.fromXDR(result.signedTxXdr, networkPassphrase);
+  const tx = TransactionBuilder.fromXDR(result.signedTxXdr, NETWORK_PASSPHRASE);
   const sendResult = await server.sendTransaction(tx);
 
   if (sendResult.status === "PENDING" || sendResult.status === "DUPLICATE") {
@@ -76,42 +69,16 @@ export async function submitScore(
 ): Promise<string> {
   if (!CONTRACT_ADDRESS) throw new Error("Contract not deployed yet");
 
-  let account;
-  try {
-    account = await server.getAccount(callerAddress);
-  } catch (e: any) {
-    if (e?.response?.status === 404 || `${e}`.includes("not exist")) {
-      throw new Error(
-        "Your Stellar account has not been funded on testnet yet. " +
-          "Get free testnet lumens at https://stellar.org/laboratory#xlm-faucet " +
-          "or ask the team to send you some."
-      );
-    }
-    throw new Error(`Could not fetch account: ${e?.message || e}`);
-  }
+  const client = getClient(callerAddress);
 
-  const contract = new Contract(CONTRACT_ADDRESS);
-  const tx = new TransactionBuilder(account, {
-    fee: "10000",
-    networkPassphrase: NETWORK_PASSPHRASE,
-  })
-    .addOperation(
-      contract.call(
-        "submit_score",
-        toScValAddress(callerAddress),
-        toScValU64(score)
-      )
-    )
-    .setTimeout(30)
-    .build();
+  // Build and simulate via the typed client
+  const tx = await client.submit_score({
+    player: callerAddress,
+    score: BigInt(score),
+  });
 
-  const simulateResult = await server.simulateTransaction(tx);
-  if (!("result" in simulateResult) || !simulateResult.result) {
-    throw new Error(`Simulation failed: ${JSON.stringify(simulateResult)}`);
-  }
-
-  const assembled = rpc.assembleTransaction(tx, simulateResult).build();
-  return signAndSend(assembled.toXDR());
+  // Sign & send using Freighter
+  return signAndSend(tx.toXDR());
 }
 
 // ─── Read-only calls ──────────────────────────────────────
@@ -120,41 +87,17 @@ export async function getScore(playerAddress: string): Promise<number> {
   if (!CONTRACT_ADDRESS) return 0;
 
   try {
-    const source = await getReadOnlyAccount();
-    const contract = new Contract(CONTRACT_ADDRESS);
-    const result = await server.simulateTransaction(
-      new TransactionBuilder(source, {
-        fee: "10000",
-        networkPassphrase: NETWORK_PASSPHRASE,
-      })
-        .addOperation(
-          contract.call("get_score", toScValAddress(playerAddress))
-        )
-        .setTimeout(30)
-        .build()
-    );
-
-    if ("result" in result && result.result?.retval) {
-      return Number(scValToNative(result.result.retval));
-    }
-    return 0;
+    const client = getClient(playerAddress);
+    const tx = await client.get_score({ player: playerAddress });
+    return Number(tx.result);
   } catch {
     return 0;
   }
 }
 
-// Helper: get account for read-only simulation (fallback to a dummy if account doesn't exist)
-async function getReadOnlyAccount(): Promise<any> {
-  const dummyKey = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ";
-  try {
-    return await server.getAccount(dummyKey);
-  } catch {
-    // If the account doesn't exist on testnet, return a minimal stub
-    return {
-      accountId: () => dummyKey,
-      sequenceNumber: () => "0",
-    };
-  }
+export interface LeaderboardEntry {
+  player: string;
+  score: number;
 }
 
 export async function getLeaderboard(
@@ -163,26 +106,12 @@ export async function getLeaderboard(
   if (!CONTRACT_ADDRESS) return [];
 
   try {
-    const source = await getReadOnlyAccount();
-    const contract = new Contract(CONTRACT_ADDRESS);
-    const result = await server.simulateTransaction(
-      new TransactionBuilder(source, {
-        fee: "10000",
-        networkPassphrase: NETWORK_PASSPHRASE,
-      })
-        .addOperation(contract.call("get_leaderboard", toScValU32(topN)))
-        .setTimeout(30)
-        .build()
-    );
-
-    if ("result" in result && result.result?.retval) {
-      const vec = scValToNative(result.result.retval) as any[];
-      return vec.map((entry: any) => ({
-        player: entry.player as string,
-        score: Number(entry.score),
-      }));
-    }
-    return [];
+    const client = getClient();
+    const tx = await client.get_leaderboard({ top_n: topN });
+    return tx.result.map((entry) => ({
+      player: entry.player,
+      score: Number(entry.score),
+    }));
   } catch {
     return [];
   }
@@ -192,22 +121,9 @@ export async function getRewardToken(): Promise<string> {
   if (!CONTRACT_ADDRESS) return "";
 
   try {
-    const source = await getReadOnlyAccount();
-    const contract = new Contract(CONTRACT_ADDRESS);
-    const result = await server.simulateTransaction(
-      new TransactionBuilder(source, {
-        fee: "10000",
-        networkPassphrase: NETWORK_PASSPHRASE,
-      })
-        .addOperation(contract.call("get_reward_token"))
-        .setTimeout(30)
-        .build()
-    );
-
-    if ("result" in result && result.result?.retval) {
-      return scValToNative(result.result.retval) as string;
-    }
-    return "";
+    const client = getClient();
+    const tx = await client.get_reward_token();
+    return tx.result;
   } catch {
     return "";
   }
