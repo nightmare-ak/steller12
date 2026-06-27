@@ -26,6 +26,7 @@
     ],
     [],
     [],
+    [],
     [
       [
         "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
@@ -39,7 +40,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "u64": "100"
+                  "u64": "50"
                 }
               ]
             }
@@ -83,7 +84,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
                 },
                 {
-                  "u64": "100"
+                  "u64": "75"
                 }
               ]
             }
@@ -92,6 +93,8 @@
         }
       ]
     ],
+    [],
+    [],
     []
   ],
   "ledger": {
@@ -164,7 +167,7 @@
               },
               "durability": "persistent",
               "val": {
-                "u64": "100"
+                "u64": "50"
               }
             }
           },
@@ -218,7 +221,7 @@
               },
               "durability": "persistent",
               "val": {
-                "u64": "100"
+                "u64": "75"
               }
             }
           },
@@ -270,26 +273,6 @@
                                   "symbol": "player"
                                 },
                                 "val": {
-                                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                                }
-                              },
-                              {
-                                "key": {
-                                  "symbol": "score"
-                                },
-                                "val": {
-                                  "u64": "100"
-                                }
-                              }
-                            ]
-                          },
-                          {
-                            "map": [
-                              {
-                                "key": {
-                                  "symbol": "player"
-                                },
-                                "val": {
                                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
                                 }
                               },
@@ -318,7 +301,27 @@
                                   "symbol": "score"
                                 },
                                 "val": {
-                                  "u64": "100"
+                                  "u64": "75"
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "map": [
+                              {
+                                "key": {
+                                  "symbol": "player"
+                                },
+                                "val": {
+                                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                                }
+                              },
+                              {
+                                "key": {
+                                  "symbol": "score"
+                                },
+                                "val": {
+                                  "u64": "50"
                                 }
                               }
                             ]

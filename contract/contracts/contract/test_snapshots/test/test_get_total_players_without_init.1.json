@@ -6,6 +6,7 @@
   },
   "auth": [
     [],
+    [],
     [
       [
         "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
@@ -19,7 +20,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
                 },
                 {
-                  "u64": "100"
+                  "u64": "50"
                 }
               ]
             }
@@ -28,7 +29,6 @@
         }
       ]
     ],
-    [],
     []
   ],
   "ledger": {
@@ -60,7 +60,7 @@
               },
               "durability": "persistent",
               "val": {
-                "u64": "100"
+                "u64": "50"
               }
             }
           },
@@ -108,7 +108,7 @@
                                   "symbol": "score"
                                 },
                                 "val": {
-                                  "u64": "100"
+                                  "u64": "50"
                                 }
                               }
                             ]

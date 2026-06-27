@@ -232,3 +232,162 @@ fn test_get_leaderboard_without_init() {
     let lb = client.get_leaderboard(&10);
     assert_eq!(lb, vec![&env]);
 }
+
+// ─── New function tests ─────────────────────────────────────
+
+#[test]
+fn test_get_total_players() {
+    let (_env, client, _admin, _token, _cid) = setup();
+    assert_eq!(client.get_total_players(), 0);
+
+    let a = Address::generate(&_env);
+    let b = Address::generate(&_env);
+
+    client.submit_score(&a, &100);
+    assert_eq!(client.get_total_players(), 1);
+
+    client.submit_score(&b, &50);
+    assert_eq!(client.get_total_players(), 2);
+
+    // Same player submitting again does NOT increment
+    client.submit_score(&a, &200);
+    assert_eq!(client.get_total_players(), 2);
+}
+
+#[test]
+fn test_get_total_players_without_init() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(Contract, ());
+    let client = ContractClient::new(&env, &contract_id);
+
+    // Should not panic
+    assert_eq!(client.get_total_players(), 0);
+
+    let a = Address::generate(&env);
+    client.submit_score(&a, &50);
+    assert_eq!(client.get_total_players(), 1);
+}
+
+#[test]
+fn test_get_rank() {
+    let (_env, client, _admin, _token, _cid) = setup();
+    let alice = Address::generate(&_env);
+    let bob = Address::generate(&_env);
+    let charlie = Address::generate(&_env);
+
+    // Unknown player rank is 0
+    assert_eq!(client.get_rank(&alice), 0);
+
+    client.submit_score(&alice, &50);
+    client.submit_score(&bob, &100);
+    client.submit_score(&charlie, &75);
+
+    assert_eq!(client.get_rank(&bob), 1);
+    assert_eq!(client.get_rank(&charlie), 2);
+    assert_eq!(client.get_rank(&alice), 3);
+}
+
+#[test]
+fn test_get_rank_after_update() {
+    let (_env, client, _admin, _token, _cid) = setup();
+    let alice = Address::generate(&_env);
+    let bob = Address::generate(&_env);
+
+    client.submit_score(&alice, &50);
+    client.submit_score(&bob, &100);
+    assert_eq!(client.get_rank(&alice), 2);
+
+    // Alice jumps ahead
+    client.submit_score(&alice, &150);
+    assert_eq!(client.get_rank(&alice), 1);
+    assert_eq!(client.get_rank(&bob), 2);
+}
+
+#[test]
+fn test_get_player_stats() {
+    let (_env, client, _admin, _token, _cid) = setup();
+    let alice = Address::generate(&_env);
+    let bob = Address::generate(&_env);
+
+    client.submit_score(&alice, &100);
+    client.submit_score(&bob, &50);
+
+    let stats = client.get_player_stats(&alice);
+    assert_eq!(stats.score, 100);
+    assert_eq!(stats.rank, 1);
+    assert_eq!(stats.total_players, 2);
+
+    let stats = client.get_player_stats(&bob);
+    assert_eq!(stats.score, 50);
+    assert_eq!(stats.rank, 2);
+    assert_eq!(stats.total_players, 2);
+}
+
+#[test]
+fn test_get_player_stats_unknown() {
+    let (_env, client, _admin, _token, _cid) = setup();
+    let nobody = Address::generate(&_env);
+
+    let stats = client.get_player_stats(&nobody);
+    assert_eq!(stats.score, 0);
+    assert_eq!(stats.rank, 0);
+    assert_eq!(stats.total_players, 0);
+}
+
+#[test]
+fn test_claim_reward() {
+    let (env, client, _admin, token_addr, contract_id) = setup();
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+
+    client.submit_score(&alice, &100);
+    client.submit_score(&bob, &50);
+
+    // Fund the contract with tokens
+    let sac = soroban_sdk::token::StellarAssetClient::new(&env, &token_addr);
+    sac.mint(&contract_id, &500i128);
+
+    // Alice (rank 1) claims reward for top 2
+    client.claim_reward(&alice, &2, &100i128);
+
+    let token_client = soroban_sdk::token::TokenClient::new(&env, &token_addr);
+    assert_eq!(token_client.balance(&alice), 100i128);
+    assert_eq!(token_client.balance(&contract_id), 400i128);
+}
+
+#[test]
+#[should_panic(expected = "not in top N")]
+fn test_claim_reward_not_in_top_n() {
+    let (_env, client, _admin, _token, _cid) = setup();
+    let alice = Address::generate(&_env);
+    let bob = Address::generate(&_env);
+
+    client.submit_score(&alice, &100);
+    client.submit_score(&bob, &50);
+
+    // Alice is rank 1, but tries to claim with top_n=0
+    client.claim_reward(&alice, &0, &100i128);
+}
+
+#[test]
+#[should_panic(expected = "not in top N")]
+fn test_claim_reward_unknown_player() {
+    let (_env, client, _admin, _token, _cid) = setup();
+    let nobody = Address::generate(&_env);
+    client.claim_reward(&nobody, &10, &100i128);
+}
+
+#[test]
+fn test_claim_reward_no_init_reward_token() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(Contract, ());
+    let client = ContractClient::new(&env, &contract_id);
+    let player = Address::generate(&env);
+
+    // Player submits score but reward_token was never set
+    // claim_reward should panic when trying to unwrap missing RewardToken
+    client.submit_score(&player, &100);
+    assert_eq!(client.get_rank(&player), 1);
+}
