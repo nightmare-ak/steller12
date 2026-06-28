@@ -1,4 +1,7 @@
-CONTRACT_ADDRESS = CABX5FTHFQ3AKJP575FRJRGSCO4J5Y3QOL5HF7OTY3YPMJ65AAFKUOT6
+NEXT_PUBLIC_CONTRACT_ADDRESS=CABX5FTHFQ3AKJP575FRJRGSCO4J5Y3QOL5HF7OTY3YPMJ65AAFKUOT6
+NEXT_PUBLIC_RPC_URL=https://soroban-testnet.stellar.org
+NEXT_PUBLIC_NETWORK_PASSPHRASE=Test SDF Network ; September 2015
+
 # Stellar Racer 🚀
 
 A space-themed dodge-and-survive arcade game where your high scores are permanently recorded on the **Stellar blockchain** via a **Soroban smart contract**.
